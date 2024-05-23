@@ -78,14 +78,17 @@ namespace WpfAudioPlayer
 
         private void btnPlayPlaylist_Click(object sender, RoutedEventArgs e)
         {
-            MainWindow.playlist.Clear();
-            foreach (string audio in lbPlaylistAudios.Items.Cast<string>())
+            if (lbPlaylistAudios.Items.Count != 0)
             {
-                MainWindow.playlist.Add(audio);
+                MainWindow.playlist.Clear();
+                foreach (string audio in lbPlaylistAudios.Items.Cast<string>())
+                {
+                    MainWindow.playlist.Add(audio);
+                }
+                MainWindow.currentAudioIndex = 0;
+                MainWindow.mediaPlayer.Open(new Uri(MainWindow.playlist[MainWindow.currentAudioIndex]));
+                MainWindow.Play();
             }
-            MainWindow.currentAudioIndex = 0;
-            MainWindow.mediaPlayer.Open(new Uri(MainWindow.playlist[MainWindow.currentAudioIndex]));
-            MainWindow.Play();
         }
     }
 }
