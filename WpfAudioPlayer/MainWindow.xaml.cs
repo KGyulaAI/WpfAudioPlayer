@@ -1,4 +1,5 @@
 ﻿using Microsoft.Win32;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -20,13 +21,12 @@ namespace WpfAudioPlayer
     /// </summary>
     public partial class MainWindow : Window
     {
-        MediaPlayer mediaPlayer = new MediaPlayer();
-        DispatcherTimer timer = new DispatcherTimer();
+        public static MediaPlayer mediaPlayer = new MediaPlayer();
+        static DispatcherTimer timer = new DispatcherTimer();
         OpenFileDialog openFileDialog;
-        string folderPath;
-        List<string> folderPlaylist;
+        public static List<string> playlist = new List<string>();
         Button pauseButton;
-        int currentAudioIndex;
+        public static int currentAudioIndex;
         public MainWindow()
         {
             InitializeComponent();
@@ -81,7 +81,7 @@ namespace WpfAudioPlayer
             pauseButton.Visibility = Visibility.Visible;
             Play();
         }
-        private void Play()
+        public static void Play()
         {
             mediaPlayer.Play();
             timer.Start();
@@ -101,9 +101,9 @@ namespace WpfAudioPlayer
             }
             else if (currentAudioIndex == 0)
             {
-                currentAudioIndex = folderPlaylist.Count - 1;
+                currentAudioIndex = playlist.Count - 1;
             }
-            mediaPlayer.Open(new Uri(folderPlaylist[currentAudioIndex]));
+            mediaPlayer.Open(new Uri(playlist[currentAudioIndex]));
             UpdateSongInfo();
             Play();
         }
@@ -113,34 +113,37 @@ namespace WpfAudioPlayer
         }
         private void PlayNext()
         {
-            if (currentAudioIndex < folderPlaylist.Count - 1)
+            if (currentAudioIndex < playlist.Count - 1)
             {
                 currentAudioIndex++;
             }
-            else if (currentAudioIndex == folderPlaylist.Count - 1)
+            else if (currentAudioIndex == playlist.Count - 1)
             {
                 currentAudioIndex = 0;
             }
-            mediaPlayer.Open(new Uri(folderPlaylist[currentAudioIndex]));
+            mediaPlayer.Open(new Uri(playlist[currentAudioIndex]));
             UpdateSongInfo();
             Play();
         }
         private void UpdateSongInfo()
         {
-             TagLib.File file = TagLib.File.Create(folderPlaylist[currentAudioIndex]);
-             tbTitle.Text = file.Tag.Title;
-             tbArtist.Text = file.Tag.FirstPerformer;
-             lblTotalTime.Content = file.Properties.Duration.ToString(@"mm\:ss");
-
-             if (file.Tag.Pictures.Length > 0)
-             {
-                 var bin = file.Tag.Pictures[0].Data.Data;
-                 imgAlbum.Source = LoadImage(bin);
-             }
-             else
-             {
-                 imgAlbum.Source = null;
-             }
+            TagLib.File file = TagLib.File.Create(playlist[currentAudioIndex]);
+            tbTitle.Text = file.Tag.Title != null ? file.Tag.Title : file.Name;
+            tbArtist.Text = file.Tag.FirstPerformer != null ? file.Tag.FirstPerformer : "UNKNOWN AUTHOR";
+            lblTotalTime.Content = file.Properties.Duration.ToString(@"mm\:ss");
+            if (file.Tag.Pictures.Length != 0)
+            {
+                BitmapImage albumCover = LoadImage(file.Tag.Pictures[0].Data.Data);
+                imgAlbum.Source = albumCover;
+            }
+            else
+            {
+                BitmapImage bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri("Resources/album-cover.png", UriKind.RelativeOrAbsolute);
+                bitmap.EndInit();
+                imgAlbum.Source = bitmap;
+            }
         }
         private BitmapImage LoadImage(byte[] imageData)
         {
@@ -164,17 +167,22 @@ namespace WpfAudioPlayer
         private void btnSelectFile_Click(object sender, RoutedEventArgs e)
         {
             openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "Audio Files|*.mp3;*.wav;*.wma";
+            openFileDialog.Filter = "Audio Files|*.mp3;*.wav;*.wma;*.m4a";
             if (openFileDialog.ShowDialog() == true)
             {
-                folderPath = System.IO.Path.GetDirectoryName(openFileDialog.FileName);
-                folderPlaylist = Directory.GetFiles(folderPath, "*.mp3")
+                string folderPath = System.IO.Path.GetDirectoryName(openFileDialog.FileName);
+                playlist = Directory.GetFiles(folderPath, "*.mp3")
                                        .Concat(Directory.GetFiles(folderPath, "*.wav"))
                                        .Concat(Directory.GetFiles(folderPath, "*.wma"))
+                                       .Concat(Directory.GetFiles(folderPath, "*.m4a"))
                                        .ToList();
-                currentAudioIndex = folderPlaylist.IndexOf(openFileDialog.FileName);
-                mediaPlayer.Open(new Uri(folderPlaylist[currentAudioIndex]));
+                currentAudioIndex = playlist.IndexOf(openFileDialog.FileName);
+                mediaPlayer.Open(new Uri(playlist[currentAudioIndex]));
             }
+        }
+        private void btnAddToPlaylist_Click(object sender, RoutedEventArgs e)
+        {
+            new Playlists().Show();
         }
         private void btnVolume_Click(object sender, RoutedEventArgs e)
         {
@@ -206,7 +214,12 @@ namespace WpfAudioPlayer
             {
                 btnVolume.Content = "🔊";
             }
+            
             mediaPlayer.Volume = sliVolume.Value / sliVolume.Maximum;
+            if (wdMainWindow.IsEnabled)
+            {
+                lblCurrentVolume.Content = sliVolume.Value.ToString("000");
+            }
         }
         private void sliVolume_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -236,6 +249,10 @@ namespace WpfAudioPlayer
                 double newPosition = ratio * slider.Maximum;
                 slider.Value = newPosition;
             }
+        }
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            IsEnabled = true;
         }
     }
 }
